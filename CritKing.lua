@@ -5,10 +5,11 @@ CRITKINGVERSION = "0.5"
 CritKing = {} -- critking class :)
 CritKing.__index = CritKing
 
-CritKingDisplay = "on" -- saved variable, per character
-CritKingResetOnNormalHit = "on" -- reset crit statistic when hit normal
-CritKingSoundKill = "on" -- saved variable to play sound or not when kill monster
-CritKingSoundCrit = "on" -- saved variable to play sound or not when crit hit
+CritKingDisplay = CritKingDisplay or "on" -- saved variable, per character
+CritKingResetOnNormalHit = CritKingResetOnNormalHit or "on" -- reset crit statistic when hit normal
+CritKingSoundKill = CritKingSoundKill or "on" -- saved variable to play sound or not when kill monster
+CritKingSoundCrit = CritKingSoundCrit or "on" -- saved variable to play sound or not when crit hit
+CritKingAllCrit = CritKingAllCrit or 0
 
 CritKing.VariablesLoaded = false
 
@@ -233,10 +234,13 @@ function CritKing.OnCommand( args )
     CritKing.SendMsg( " - Max crit num: " .. CritKing.MaxCritNum )
     CritKing.SendMsg( " - Max kill num: " .. CritKing.MaxKillNum )
     CritKing.SendMsg( " - Avg crit damage: " .. avgCritDmg )
+    CritKing.SendMsg( " - All crit num: " .. CritKingAllCrit )
 end
 
 -- Fired when the player hit critical
 function CritKing.OnCrit( action, num )
+
+    CritKingAllCrit = CritKingAllCrit + 1
 
     if ( CritKingDisplay == "on" ) then
         local msg = CritKing.CritMessages[ num ]
@@ -283,7 +287,7 @@ end
 function CritKing.ResetStat()
     CritKing.ResetCrit()
     CritKing.ResetKill()
-    critking.SumCritDmg = 0
+    CritKing.SumCritDmg = 0
 end
 
 function CritKing.OnCombatLog( ... )

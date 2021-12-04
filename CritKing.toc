@@ -4,6 +4,6 @@
 ## Version: 0.5
 ## Notes: Crit and Killing blow counter
 ## eMail: twilek@twilek.hu
-## SavedVariablesPerCharacter: CritKingDisplay, CritKingResetOnNormalHit, CritKingSound
+## SavedVariablesPerCharacter: CritKingDisplay, CritKingResetOnNormalHit, CritKingSoundKill, CritKingSoundCrit, CritKingAllCrit
 
 CritKing.lua
