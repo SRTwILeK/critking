@@ -5,11 +5,45 @@ CRITKINGVERSION = "0.5"
 CritKing = {} -- critking class :)
 CritKing.__index = CritKing
 
-CritKingDisplay = CritKingDisplay or "on" -- saved variable, per character
-CritKingResetOnNormalHit = CritKingResetOnNormalHit or "on" -- reset crit statistic when hit normal
-CritKingSoundKill = CritKingSoundKill or "on" -- saved variable to play sound or not when kill monster
-CritKingSoundCrit = CritKingSoundCrit or "on" -- saved variable to play sound or not when crit hit
-CritKingAllCrit = CritKingAllCrit or 0
+CritKingVarsDefault = {
+    Display = true,
+    ResetOnNormalHit = true,
+    Sound = {
+        Kill = true,
+        Crit = true,
+        Ach = {
+            Crit = true
+        }
+    },
+    Stat = {
+        Sum = {
+            Crit = 0,
+            Kill = 0
+        }
+    }
+}
+
+function CritKingLoadVar( objSrc, objDst )
+    for key, value in pairs( objSrc ) do
+        if ( objDst[ key ] == nil ) then
+            objDst[ key ] = value
+        elseif ( type( value ) == 'table' ) then
+            if ( objDst[ key ] == nil ) then
+                objDst[ key ] = {}
+            end
+            CritKingLoadVar( value, objDst[ key ])
+        end
+    end
+
+    CritKing.SendMsg( "Set variables from defaults ..." )
+end
+
+
+--CritKingDisplay = CritKingDisplay or "on" -- saved variable, per character
+--CritKingResetOnNormalHit = CritKingResetOnNormalHit or "on" -- reset crit statistic when hit normal
+--CritKingSoundKill = CritKingSoundKill or "on" -- saved variable to play sound or not when kill monster
+--CritKingSoundCrit = CritKingSoundCrit or "on" -- saved variable to play sound or not when crit hit
+--CritKingAllCrit = CritKingAllCrit or 0
 
 CritKing.VariablesLoaded = false
 
@@ -122,12 +156,69 @@ CritKing.Killingsounds =
   , "Interface\\Addons\\CritKing\\sounds\\god.ogg"
 }
 
+CritKing.Sum = {
+    Crit = {
+        ['10'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\ohyeah.ogg",
+            msg = "100 Critical!!! Ohhh yeah!!!"
+        },
+        ['1000'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\ohyeah.ogg",
+            msg = "1000 Critical!!! Ohhh yeah!!! Great job!"
+        },
+        ['5000'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\killer.ogg",
+            msg = "5000 Critical!!! You are a killer machine!"
+        },
+        ['10000'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\holyshit.ogg",
+            msg = "10000 Critical!!! Holy shit! You are awesome!!"
+        },
+        ['13200'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\monsterkill.ogg",
+            msg = "13200 Critical!!! Critter killer!"
+        },
+        ['18000'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\monsterkill.ogg",
+            msg = "18000 Critical!!! Killer machine! You are the best!"
+        },
+        ['20000'] = {
+            sound = "Interface\\Addons\\CritKing\\sounds\\ownage.ogg",
+            msg = "20000 Critical!!! Ohhhh mmmmmyyyy goooooooodddddd!!!"
+        }
+    }
+}
+
 CritKing.MaxCrit = 23
 CritKing.MaxKill = 21
+
+function CritKing.AchCrit( critNum )
+    local ach = CritKing.Sum.Crit[ tostring(critNum ) ]
+    if ( ach ~= nil ) then
+        if ( CritKingVars.Display ) then
+            UIErrorsFrame:AddMessage( ach.msg )
+            CritKing.SendMsg( ach.msg )
+        end
+    
+        if ( CritKingVars.Sound.Ach.Crit ) then
+            PlaySoundFile( ach.sound )
+        end
+    
+    end
+end
 
 -- Simple message function, to the default chat frame
 function CritKing.SendMsg( msg )
     DEFAULT_CHAT_FRAME:AddMessage( CRITKINGPREFIX .. ": " .. msg, 0.598, 0.835, 0.89 )
+end
+
+function CritKing.ShowSettings()
+    local msg = 'Display: ' .. tostring( CritKingVars.Display ) .. ', Reset after normal hit: ' .. tostring( CritKingVars.ResetOnNormalHit )
+            .. ' Kill sound: ' .. tostring( CritKingVars.Sound.Kill ) .. ' Crit sound: ' .. tostring( CritKingVars.Sound.Crit )
+            .. ' Achievement crit sound: ' .. tostring( CritKingVars.Sound.Ach.Crit )
+            .. ' Crit stat: ' .. tostring( CritKingVars.Stat.Sum.Crit ) .. ' Kill stat: ' .. tostring( CritKingVars.Stat.Sum.Kill )
+
+    CritKing.SendMsg( "Settings: " .. msg )
 end
 
 -- Command handler
@@ -140,86 +231,128 @@ function CritKing.OnCommand( args )
         then
             CritKing.SendMsg( "/ck display on  - enable error frame messages" )
             CritKing.SendMsg( "/ck display off - disable error frame messages" )
+
             CritKing.SendMsg( "/ck normal on - reset critical statistic when hit normal and end of fight" )
             CritKing.SendMsg( "/ck normal off - reset critical statistic just when end of fight" )
+
             CritKing.SendMsg( "/ck critsound on - enable sound when hit critical" )
             CritKing.SendMsg( "/ck critsound off - disable sound when hit critical" )
-            CritKing.SendMsg( "/ck killsound on - enable sound when hit critical" )
-            CritKing.SendMsg( "/ck killsound off - disable sound when hit critical" )
+            CritKing.SendMsg( "/ck killsound on - enable sound when kill enemy" )
+            CritKing.SendMsg( "/ck killsound off - disable sound when kill enemy" )
+            CritKing.SendMsg( "/ck sound on - enable sound when hit critical and kill enemy" )
+            CritKing.SendMsg( "/ck sound off - disable sound when hit critical and kill enemy" )
+
+            CritKing.SendMsg( "/ck ach critsound on - enable sound when reach critical achievement" )
+            CritKing.SendMsg( "/ck ach critsound off - disable sound when reach critical achievement" )
+
+            CritKing.SendMsg( "/ck show settings" )
             CritKing.SendMsg( "/ck help - display this text" )
+
+            CritKing.SendMsg( "/ck fullreset - reset all statistic value" )
+
             CritKing.SendMsg( "/ck - display max damage, critical number, killing blow statistic" )
             return
         end
 
         if ( string.lower( args ) == "display on" )
         then
-            CritKingDisplay = "on"
+            CritKingVars.Display = true
+            --CritKingDisplay = "on"
             CritKing.SendMsg( "set display on" )
             return
         end
 
         if ( string.lower( args ) == "display off" )
         then
-            CritKingDisplay = "off"
+            CritKingVars.Display = false
+            --CritKingDisplay = "off"
             CritKing.SendMsg( "set display off" )
             return
         end
 
         if ( string.lower( args ) == "normal on" )
         then
-            CritKingResetOnNormalHit = "on"
+            CritKingVars.ResetOnNormalHit = true
             CritKing.SendMsg( "reset critical statistic when hit normal" )
             return
         end
 
         if ( string.lower( args ) == "normal off" )
         then
-            CritKingResetOnNormalHit = "off"
+            CritKingVars.ResetOnNormalHit = false
             CritKing.SendMsg( "no reset critical statistic when hit normal" )
             return
         end
 
         if ( string.lower( args ) == "critsound on" )
         then
-            CritKingSoundCrit = "on"
+            CritKingVars.Sound.Crit = true
             CritKing.SendMsg( "enable sound when hit critical" )
             return
         end
 
         if ( string.lower( args ) == "critsound off" )
         then
-            CritKingSoundCrit = "off"
+            CritKingVars.Sound.Crit = false
             CritKing.SendMsg( "disable sound when hit critical" )
             return
         end
 
         if ( string.lower( args ) == "killsound on" )
         then
-            CritKingSoundKill = "on"
+            CritKingVars.Sound.Kill = true
             CritKing.SendMsg( "enable sound when kill enemy" )
             return
         end
 
         if ( string.lower( args ) == "killsound off" )
         then
-            CritKingSoundKill = "off"
+            CritKingVars.Sound.Kill = false
             CritKing.SendMsg( "disable sound when kill enemy" )
             return
         end
 
         if ( string.lower( args ) == "sound on" )
         then
-            CritKingSoundCrit = "on"
-            CritKingSoundKill = "on"
+            CritKingVars.Sound.Crit = true
+            CritKingVars.Sound.Kill = true
             CritKing.SendMsg( "enable sound when hit critical and when kill enemy" )
             return
         end
 
         if ( string.lower( args ) == "sound off" )
         then
-            CritKingSoundCrit = "off"
-            CritKingSoundKill = "off"
+            CritKingVars.Sound.Crit = false
+            CritKingVars.Sound.Kill = false
             CritKing.SendMsg( "disable sound when hit critical and when kill enemy" )
+            return
+        end
+
+        if ( string.lower( args ) == "ach critsound on" )
+        then
+            CritKingVars.Sound.Ach.Crit = true
+            CritKing.SendMsg( "enable sound when reach critical achievement" )
+            return
+        end
+
+        if ( string.lower( args ) == "ach critsound off" )
+        then
+            CritKingVars.Sound.Ach.Crit = false
+            CritKing.SendMsg( "disable sound when reach critical achievement" )
+            return
+        end
+
+        if ( string.lower( args ) == "show settings" )
+        then
+            CritKing.ShowSettings()
+            return
+        end
+
+        if ( string.lower( args ) == "fullreset" )
+        then
+            CritKingVars.Stat.Sum.Crit = 0
+            CritKingVars.Stat.Sum.Kill = 0
+            CritKing.ResetStat()
             return
         end
     end
@@ -234,22 +367,25 @@ function CritKing.OnCommand( args )
     CritKing.SendMsg( " - Max crit num: " .. CritKing.MaxCritNum )
     CritKing.SendMsg( " - Max kill num: " .. CritKing.MaxKillNum )
     CritKing.SendMsg( " - Avg crit damage: " .. avgCritDmg )
-    CritKing.SendMsg( " - All crit num: " .. CritKingAllCrit )
+    CritKing.SendMsg( " - All crit num: " .. CritKingVars.Stat.Sum.Crit )
+    CritKing.SendMsg( " - All kill num: " .. CritKingVars.Stat.Sum.Kill )
 end
 
 -- Fired when the player hit critical
 function CritKing.OnCrit( action, num )
 
-    CritKingAllCrit = CritKingAllCrit + 1
+    CritKingVars.Stat.Sum.Crit = CritKingVars.Stat.Sum.Crit + 1
 
-    if ( CritKingDisplay == "on" ) then
+    CritKing.AchCrit( CritKingVars.Stat.Sum.Crit )
+
+    if ( CritKingVars.Display ) then
         local msg = CritKing.CritMessages[ num ]
-        local fullMsg = msg .. " (x" .. CrtiKing.CritNum .. ") Damage: " .. CritKing.Damage .. " with: " .. action
+        local fullMsg = msg .. " (x" .. CritKing.CritNum .. ") Damage: " .. CritKing.Damage .. " with: " .. action
         UIErrorsFrame:AddMessage( fullMsg )
-        CrtiKing.SendMsg( fullMsg )
+        CritKing.SendMsg( fullMsg )
     end
 
-    if ( CritKingSoundCrit == "on" ) then
+    if ( CritKingVars.Sound.Crit ) then
         local sound = CritKing.Critsounds[ num ]
         PlaySoundFile( sound )
     end
@@ -257,14 +393,17 @@ end
 
 -- Fired when the player kill an enemy
 function CritKing.OnKill()
-    if ( CritKingDisplay == "on" ) then
+
+    CritKingVars.Stat.Sum.Kill = CritKingVars.Stat.Sum.Kill + 1
+
+    if ( CritKingVars.Display ) then
         local msg = CritKing.KillingMessages[ CritKing.KillNum ]
         local fullMsg = msg .. " (x" .. CritKing.KillNum .. ")" 
         UIErrorsFrame:AddMessage( fullMsg )
         CritKing.SendMsg( fullMsg )
     end
 
-    if ( CritKingSoundKill == "on" ) then
+    if ( CritKingVars.Sound.Kill ) then
         local sound = CritKing.Killingsounds[ CritKing.KillNum ]
         PlaySoundFile( sound )
     end
@@ -353,7 +492,7 @@ function CritKing.OnCombatLog( ... )
 
         CritKing.OnCrit( action, critNum )
     else
-        if ( CritKingResetOnNormalHit == "on" )
+        if ( CritKingVars.ResetOnNormalHit )
         then
             CritKing.ResetCrit()
         end
@@ -369,6 +508,7 @@ function CritKing.OnEvent(self, event, ...)
         CritKing.VariablesLoaded = true
         CritKing.PlayerGUID = UnitGUID( "player" )
         CritKing.SendMsg( "variables loaded! " .. CRITKINGVERSION )
+        CritKingLoadVar( CritKingVarsDefault, CritKingVars )
         return
     end
 
