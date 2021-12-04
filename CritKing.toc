@@ -1,0 +1,9 @@
+## Interface: 20502
+## Title: Crit King
+## Author: TwILeK
+## Version: 0.5
+## Notes: Crit and Killing blow counter
+## eMail: twilek@twilek.hu
+## SavedVariablesPerCharacter: CritKingDisplay, CritKingResetOnNormalHit, CritKingSound
+
+CritKing.lua
