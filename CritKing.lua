@@ -1,6 +1,6 @@
 ﻿
 CRITKINGPREFIX = "CK"
-CRITKINGVERSION = "0.5"
+CRITKINGVERSION = "0.5.1"
 
 CritKing = {} -- critking class :)
 CritKing.__index = CritKing

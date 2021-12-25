@@ -1,7 +1,7 @@
 ## Interface: 20502
 ## Title: Crit King
 ## Author: TwILeK
-## Version: 0.5
+## Version: 0.5.1
 ## Notes: Crit and Killing blow counter
 ## eMail: twilek@twilek.hu
 ## SavedVariablesPerCharacter: CritKingVars
