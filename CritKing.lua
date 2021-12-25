@@ -24,6 +24,9 @@ CritKingVarsDefault = {
 }
 
 function CritKingLoadVar( objSrc, objDst )
+	if ( objDst == nil ) then
+		objDst = {}
+	end
     for key, value in pairs( objSrc ) do
         if ( objDst[ key ] == nil ) then
             objDst[ key ] = value
@@ -508,7 +511,12 @@ function CritKing.OnEvent(self, event, ...)
         CritKing.VariablesLoaded = true
         CritKing.PlayerGUID = UnitGUID( "player" )
         CritKing.SendMsg( "variables loaded! " .. CRITKINGVERSION )
-        CritKingLoadVar( CritKingVarsDefault, CritKingVars )
+		if ( CritKingVars == nil ) then
+			CritKingVars = CritKingVarsDefault
+		else
+			CritKingLoadVar( CritKingVarsDefault, CritKingVars )
+		end	
+		
         return
     end
 
