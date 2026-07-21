@@ -1,11 +1,17 @@
 ## Interface: 20504
 ## Title: Crit King
 ## Notes: Plays announcer-style sounds and shows escalating messages for critical-hit and killing-blow streaks.
+## IconTexture: Interface\AddOns\CritKing\logo.tga
 ## Author: TwILeK
-## Version: 1.0.1
+## Version: 2.0.1
 ## X-eMail: twilek@twilek.hu
 ## X-Category: Combat
 ## X-License: All Rights Reserved
 ## SavedVariablesPerCharacter: CritKingVars
 
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
+
 CritKing.lua
+CritKingOptions.lua

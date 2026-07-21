@@ -24,6 +24,18 @@ CritKingVarsDefault = {
             Crit = 0,
             Kill = 0
         }
+    },
+    -- On-screen display banner (the frame that shows the crit/kill text)
+    Frame = {
+        Locked = true,                  -- when false, the frame shows a title bar and can be dragged
+        Font = "Fonts\\FRIZQT__.TTF",   -- one of the paths in CritKing.Fonts
+        FontSize = 28,
+        Color = { r = 1, g = 1, b = 1 },-- text color
+        Animation = "up",               -- one of the keys in CritKing.Animations
+        Point = "CENTER",               -- saved anchor of the frame
+        RelPoint = "CENTER",
+        X = 0,
+        Y = 200
     }
 }
 
@@ -201,11 +213,245 @@ CritKing.Sum = {
 CritKing.MaxCrit = 23
 CritKing.MaxKill = 21
 
+-- ============================================================
+-- On-screen display banner
+--
+-- A movable, animated frame that shows the crit/kill text. When
+-- CritKingVars.Frame.Locked is false it grows a title bar and a
+-- background so it can be dragged; the position is persisted.
+-- ============================================================
+
+CritKing.Banner = {}
+
+-- Built-in WoW fonts offered in the options dropdown. These files ship with
+-- every client (Latin locales), so they are safe to reference directly.
+CritKing.Fonts = {
+    { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
+    { name = "Arial Narrow",  path = "Fonts\\ARIALN.TTF"   },
+    { name = "Skurri",        path = "Fonts\\SKURRI.TTF"   },
+    { name = "Morpheus",      path = "Fonts\\MORPHEUS.TTF" },
+    { name = "2002",          path = "Fonts\\2002.TTF"     },
+    { name = "2002 Bold",     path = "Fonts\\2002B.TTF"    }
+}
+
+-- Available text animations offered in the options dropdown.
+CritKing.Animations = {
+    { key = "up",    name = "Float up"       },
+    { key = "down",  name = "Float down"     },
+    { key = "left",  name = "Slide left"     },
+    { key = "right", name = "Slide right"    },
+    { key = "fade",  name = "Fade in place"  },
+    { key = "none",  name = "Static (no motion)" }
+}
+
+-- LibSharedMedia exposes every font other addons have registered. Optional:
+-- if the embedded libs somehow failed to load we fall back to CritKing.Fonts.
+CritKing.LSM = LibStub and LibStub( "LibSharedMedia-3.0", true )
+
+-- Ordered { name, path } list backing the font dropdown. Prefers LSM (which
+-- already includes the built-ins in CritKing.Fonts plus any media packs).
+function CritKing.GetFontList()
+    local list = {}
+    if ( CritKing.LSM ) then
+        for _, name in ipairs( CritKing.LSM:List( "font" ) ) do
+            list[ #list + 1 ] = { name = name, path = CritKing.LSM:Fetch( "font", name ) }
+        end
+    else
+        for _, font in ipairs( CritKing.Fonts ) do
+            list[ #list + 1 ] = { name = font.name, path = font.path }
+        end
+    end
+    return list
+end
+
+-- Look up the display name for a saved font path / animation key,
+-- falling back to the raw value so an unknown setting is still visible.
+function CritKing.FontName( path )
+    if ( CritKing.LSM ) then
+        for name, p in pairs( CritKing.LSM:HashTable( "font" ) ) do
+            if ( p == path ) then return name end
+        end
+    end
+    for _, font in ipairs( CritKing.Fonts ) do
+        if ( font.path == path ) then return font.name end
+    end
+    return path
+end
+
+function CritKing.AnimName( key )
+    for _, anim in ipairs( CritKing.Animations ) do
+        if ( anim.key == key ) then return anim.name end
+    end
+    return key
+end
+
+-- Push the saved position onto the frame.
+function CritKing.Banner.ApplyPosition()
+    local f = CritKing.BannerFrame
+    if ( f == nil ) then return end
+    f:ClearAllPoints()
+    f:SetPoint( CritKingVars.Frame.Point, UIParent, CritKingVars.Frame.RelPoint,
+                CritKingVars.Frame.X, CritKingVars.Frame.Y )
+end
+
+-- Push the saved font / size onto the text.
+--
+-- WoW's SetFont ignores a *size-only* change when the font file is unchanged
+-- (which is why resizing appeared to only work when the font was also
+-- switched). Force the file to actually change first — via a throwaway font
+-- guaranteed to differ from the target — so the new size always takes. Both
+-- calls happen in the same frame, so there is no visible flicker.
+function CritKing.Banner.ApplyFont()
+    local f = CritKing.BannerFrame
+    if ( f == nil ) then return end
+
+    local font = CritKingVars.Frame.Font
+    local size = CritKingVars.Frame.FontSize
+
+    local nudge = ( font == "Fonts\\FRIZQT__.TTF" ) and "Fonts\\ARIALN.TTF" or "Fonts\\FRIZQT__.TTF"
+    f.text:SetFont( nudge, size, "OUTLINE" )
+
+    -- SetFont returns false for a bad path; fall back to a guaranteed font so
+    -- an invalid selection never leaves the throwaway nudge font showing.
+    if ( not f.text:SetFont( font, size, "OUTLINE" ) ) then
+        f.text:SetFont( "Fonts\\FRIZQT__.TTF", size, "OUTLINE" )
+    end
+end
+
+-- Push the saved text color onto the text. SetTextColor persists across
+-- SetText calls, so this only needs re-applying when the color changes.
+function CritKing.Banner.ApplyColor()
+    local f = CritKing.BannerFrame
+    if ( f == nil ) then return end
+    local c = CritKingVars.Frame.Color
+    f.text:SetTextColor( c.r, c.g, c.b )
+end
+
+-- Show or hide the title bar / background and toggle dragging,
+-- depending on whether the frame is locked.
+function CritKing.Banner.ApplyLock()
+    local f = CritKing.BannerFrame
+    if ( f == nil ) then return end
+
+    if ( CritKingVars.Frame.Locked ) then
+        f:EnableMouse( false )
+        f.bg:Hide()
+        f.title:Hide()
+        f.ag:Stop()
+        f.text:SetAlpha( 0 )
+    else
+        f:EnableMouse( true )
+        f.bg:Show()
+        f.title:Show()
+        f.ag:Stop()
+        f.text:SetText( "Head shot!" )   -- sample text so the frame can be positioned
+        f.text:SetAlpha( 1 )
+    end
+end
+
+-- Create the banner frame once. Safe to call repeatedly.
+function CritKing.Banner.Create()
+    if ( CritKing.BannerFrame ) then return end
+
+    local f = CreateFrame( "Frame", "CritKingBannerFrame", UIParent )
+    f:SetSize( 420, 80 )
+    f:SetMovable( true )
+    f:SetClampedToScreen( true )
+    f:RegisterForDrag( "LeftButton" )
+    f:SetScript( "OnDragStart", function( self ) self:StartMoving() end )
+    f:SetScript( "OnDragStop", function( self )
+        self:StopMovingOrSizing()
+        local point, _, relPoint, x, y = self:GetPoint()
+        CritKingVars.Frame.Point    = point
+        CritKingVars.Frame.RelPoint = relPoint
+        CritKingVars.Frame.X        = x
+        CritKingVars.Frame.Y        = y
+    end )
+
+    -- Background + title, only visible while unlocked.
+    local bg = f:CreateTexture( nil, "BACKGROUND" )
+    bg:SetAllPoints( f )
+    bg:SetColorTexture( 0, 0, 0, 0.4 )
+    f.bg = bg
+
+    local title = f:CreateFontString( nil, "OVERLAY", "GameFontNormal" )
+    title:SetPoint( "TOP", f, "TOP", 0, -4 )
+    title:SetText( "Crit King — drag to move (lock in /ck options)" )
+    f.title = title
+
+    -- The message text itself.
+    local text = f:CreateFontString( nil, "OVERLAY" )
+    text:SetPoint( "CENTER", f, "CENTER", 0, 0 )
+    f.text = text
+
+    -- Animation group re-used for every message: a translation plus a
+    -- fade-out. The offset is set per-message from the saved animation.
+    local ag = text:CreateAnimationGroup()
+
+    local trans = ag:CreateAnimation( "Translation" )
+    trans:SetOrder( 1 )
+    trans:SetDuration( 1.5 )
+    f.trans = trans
+
+    local fade = ag:CreateAnimation( "Alpha" )
+    fade:SetOrder( 1 )
+    fade:SetFromAlpha( 1 )
+    fade:SetToAlpha( 0 )
+    fade:SetDuration( 1.0 )
+    fade:SetStartDelay( 0.8 )
+    f.fade = fade
+
+    ag:SetScript( "OnFinished", function()
+        -- Keep the sample text visible while unlocked; otherwise hide.
+        if ( CritKingVars.Frame.Locked ) then
+            text:SetAlpha( 0 )
+        else
+            text:SetAlpha( 1 )
+        end
+    end )
+    f.ag = ag
+
+    CritKing.BannerFrame = f
+
+    CritKing.Banner.ApplyPosition()
+    CritKing.Banner.ApplyFont()
+    CritKing.Banner.ApplyColor()
+    CritKing.Banner.ApplyLock()
+end
+
+-- Show a message on the banner using the configured animation.
+function CritKing.Banner.Show( msg )
+    local f = CritKing.BannerFrame
+    if ( f == nil ) then return end
+
+    local anim = CritKingVars.Frame.Animation
+    local dist = 40
+
+    f.ag:Stop()
+    CritKing.Banner.ApplyFont()   -- guarantee the current font + size at display time
+    f.text:SetText( msg )
+    f.text:SetAlpha( 1 )
+
+    if ( anim == "up" ) then
+        f.trans:SetOffset( 0, dist )
+    elseif ( anim == "down" ) then
+        f.trans:SetOffset( 0, -dist )
+    elseif ( anim == "left" ) then
+        f.trans:SetOffset( -dist, 0 )
+    elseif ( anim == "right" ) then
+        f.trans:SetOffset( dist, 0 )
+    else -- "fade" and "none" keep the text in place
+        f.trans:SetOffset( 0, 0 )
+    end
+
+    f.ag:Play()
+end
+
 function CritKing.AchCrit( critNum )
     local ach = CritKing.Sum.Crit[ tostring(critNum ) ]
     if ( ach ~= nil ) then
         if ( CritKingVars.Display ) then
-            UIErrorsFrame:AddMessage( ach.msg )
+            CritKing.Banner.Show( ach.msg )
             CritKing.SendMsg( ach.msg )
         end
     
@@ -225,6 +471,9 @@ function CritKing.ShowSettings()
     local msg = 'Display: ' .. tostring( CritKingVars.Display ) .. ', Reset after normal hit: ' .. tostring( CritKingVars.ResetOnNormalHit )
             .. ', Kill sound: ' .. tostring( CritKingVars.Sound.Kill ) .. ', Crit sound: ' .. tostring( CritKingVars.Sound.Crit )
             .. ', Achievement crit sound: ' .. tostring( CritKingVars.Sound.Ach.Crit )
+            .. ', Frame locked: ' .. tostring( CritKingVars.Frame.Locked )
+            .. ', Font: ' .. CritKing.FontName( CritKingVars.Frame.Font ) .. ', Font size: ' .. tostring( CritKingVars.Frame.FontSize )
+            .. ', Animation: ' .. CritKing.AnimName( CritKingVars.Frame.Animation )
             .. ', Total crits: ' .. tostring( CritKingVars.Stat.Sum.Crit ) .. ', Total kills: ' .. tostring( CritKingVars.Stat.Sum.Kill )
 
     CritKing.SendMsg( "Settings: " .. msg )
@@ -253,6 +502,8 @@ function CritKing.OnCommand( args )
 
             CritKing.SendMsg( "/ck ach critsound on - enable the sound when you reach a crit achievement" )
             CritKing.SendMsg( "/ck ach critsound off - disable the sound when you reach a crit achievement" )
+
+            CritKing.SendMsg( "/ck options - open the settings panel" )
 
             CritKing.SendMsg( "/ck show settings - show the current settings" )
             CritKing.SendMsg( "/ck help - show this text" )
@@ -351,6 +602,13 @@ function CritKing.OnCommand( args )
             return
         end
 
+        if ( ( string.lower( args ) == "options" )
+           or ( string.lower( args ) == "config"  ) )
+        then
+            CritKing.OpenOptions()
+            return
+        end
+
         if ( string.lower( args ) == "show settings" )
         then
             CritKing.ShowSettings()
@@ -390,7 +648,7 @@ function CritKing.OnCrit( action, num )
     if ( CritKingVars.Display ) then
         local msg = CritKing.CritMessages[ num ]
         local fullMsg = msg .. " (x" .. CritKing.CritNum .. ") Damage: " .. CritKing.Damage .. " with: " .. action
-        UIErrorsFrame:AddMessage( fullMsg )
+        CritKing.Banner.Show( msg )
         CritKing.SendMsg( fullMsg )
     end
 
@@ -407,8 +665,8 @@ function CritKing.OnKill()
 
     if ( CritKingVars.Display ) then
         local msg = CritKing.KillingMessages[ CritKing.KillNum ]
-        local fullMsg = msg .. " (x" .. CritKing.KillNum .. ")" 
-        UIErrorsFrame:AddMessage( fullMsg )
+        local fullMsg = msg .. " (x" .. CritKing.KillNum .. ")"
+        CritKing.Banner.Show( msg )
         CritKing.SendMsg( fullMsg )
     end
 
@@ -528,6 +786,9 @@ function CritKing.OnEvent(self, event, ...)
         CritKing.PlayerGUID = UnitGUID( "player" )
         CritKing.SendMsg( "Loaded! Version " .. CRITKINGVERSION )
 		CritKingVars = CritKingLoadVar( CritKingVarsDefault, CritKingVars )
+
+        CritKing.Banner.Create()
+        CritKing.CreateOptionsPanel()
 
         return
     end

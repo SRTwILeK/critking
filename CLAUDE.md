@@ -18,9 +18,16 @@ that API era.
 
 - `CritKing.toc` — addon manifest. Declares the load file, `## Interface` version, and
   `## SavedVariablesPerCharacter: CritKingVars` (per-character persistence).
-- `CritKing.lua` — the entire addon (single file).
+- `CritKing.lua` — core addon: events, combat-log parsing, counters, the on-screen display
+  **banner** (`CritKing.Banner`, a movable/animated frame), and slash commands.
+- `CritKingOptions.lua` — the Interface Options panel (`CritKing.CreateOptionsPanel` / `OpenOptions`),
+  registered on the game's AddOns options page and opened with `/ck options`.
 - `sounds/*.ogg` — announcer voice clips, referenced by hardcoded in-game paths
   (`Interface\Addons\CritKing\sounds\<name>.ogg`).
+- `logo.tga` — the addon-list icon (`## IconTexture` in the `.toc`); a 64×64 **uncompressed** TGA converted
+  from `logo.png` (the PNG source is repo-only and excluded from the package by `build.sh`).
+- `Libs/` — embedded third-party libraries loaded before `CritKing.lua`: `LibStub`, `CallbackHandler-1.0`,
+  and `LibSharedMedia-3.0` (used to source the font list; see below).
 
 ## Architecture
 
@@ -36,9 +43,26 @@ Everything hangs off the global `CritKing` table (used as a namespace/pseudo-cla
    - `PARTY_KILL` → increments `KillNum` streak → `OnKill()`.
    - a `critical` hit (from `SWING_DAMAGE` / `SPELL_DAMAGE`) → increments `CritNum` streak → `OnCrit()`.
    - a non-crit hit → resets the crit streak **only if** `CritKingVars.ResetOnNormalHit` is set.
-3. `OnCrit` / `OnKill` do three things: bump the lifetime counter in `CritKingVars.Stat.Sum`, print the streak
-   message to `UIErrorsFrame` + chat (gated on `CritKingVars.Display`), and `PlaySoundFile` the matching clip
-   (gated on `CritKingVars.Sound.Crit` / `.Kill`).
+3. `OnCrit` / `OnKill` do three things: bump the lifetime counter in `CritKingVars.Stat.Sum`, show the streak
+   message on the display banner (`CritKing.Banner.Show`) + chat (gated on `CritKingVars.Display`), and
+   `PlaySoundFile` the matching clip (gated on `CritKingVars.Sound.Crit` / `.Kill`).
+
+### Display banner (`CritKing.Banner`)
+
+The on-screen text is a single reusable frame (`CritKingBannerFrame`) built once in `CritKing.Banner.Create`
+during `VARIABLES_LOADED`. It carries one `FontString` animated by a shared `AnimationGroup` (a translation +
+fade); `CritKing.Banner.Show(msg)` sets the offset from `CritKingVars.Frame.Animation` and replays it.
+Appearance/position come from `CritKingVars.Frame` (`Font`, `FontSize`, `Color` {r,g,b}, `Animation`, `Locked`,
+`Point`/`RelPoint`/`X`/`Y`) and are pushed onto the frame by `ApplyFont` / `ApplyColor` / `ApplyPosition` /
+`ApplyLock`. When unlocked the frame
+shows a title + background and is draggable; `OnDragStop` persists the new anchor. The animation option list
+lives in `CritKing.Animations`; `CritKing.AnimName` maps a saved key back to its label.
+
+Fonts come from **LibSharedMedia-3.0** when it loaded (`CritKing.LSM`): `CritKing.GetFontList()` returns the
+LSM font list (which already includes the built-ins plus any media packs), falling back to the hardcoded
+`CritKing.Fonts` table if the lib is missing. `CritKing.FontName` reverse-maps a saved font *path* to its
+display name via `LSM:HashTable("font")`. Note the saved value in `CritKingVars.Frame.Font` is always a font
+**path** (what `SetFont` needs), not an LSM key — so it works with or without the library.
 
 ### Two counter concepts — don't conflate them
 
@@ -59,7 +83,8 @@ automatically — don't read a new field without a default or old saves will err
 
 Registered as `/ck` (`SLASH_CRK_CMD1`, dispatched via `CritKing.OnCommand`). `/ck help` lists them:
 `display on|off`, `normal on|off`, `critsound on|off`, `killsound on|off`, `sound on|off`,
-`ach critsound on|off`, `show settings`, `fullreset`, and bare `/ck` prints max damage / crit / kill stats.
+`ach critsound on|off`, `options` (opens the settings panel; `config` is an alias), `show settings`,
+`fullreset`, and bare `/ck` prints max damage / crit / kill stats.
 Commands are matched by exact lowercased string, so a new subcommand needs its own `string.lower(args) == "..."`
 branch.
 

@@ -10,6 +10,9 @@
 #   └── CritKing/
 #       ├── CritKing.toc
 #       ├── CritKing.lua
+#       ├── CritKingOptions.lua
+#       ├── logo.tga          (addon-list icon; logo.png source is excluded)
+#       ├── Libs/             (embedded LibStub, CallbackHandler-1.0, LibSharedMedia-3.0)
 #       └── sounds/
 #
 # Usage:
@@ -41,6 +44,7 @@ EXCLUDES=(
 	"build.sh"
 	"CLAUDE.md"
 	"DESCRIPTION.txt"
+	"logo.png"
 	"release"
 )
 
