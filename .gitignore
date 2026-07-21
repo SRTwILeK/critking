@@ -1,0 +1,7 @@
+# Build output
+release/
+*.zip
+
+# macOS
+.DS_Store
+._*
