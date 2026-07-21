@@ -1,0 +1,33 @@
+Crit King is a fun combat addon that plays a sound and shows an on-screen message whenever you land a critical hit or a killing blow.
+
+The sounds and messages come from Unreal Tournament. As you chain critical strikes together with melee, spell, or ranged attacks, the announcer climbs higher and higher - from "Head shot!" all the way up to "Ownage!" - and kills build their own streak, from "First Blood!" to "YES! I'm a GOD!".
+
+It also tracks your critical strikes, kills, longest streaks, and biggest hit, plays special "achievement" sounds as your lifetime crit count reaches milestones, and lets you view the statistics at any time.
+
+Built for World of Warcraft Classic (The Burning Crusade, 2.5.4). Every sound and on-screen message can be toggled on or off.
+
+Addon commands:
+
+/ck - show your max damage, critical-hit and killing-blow statistics
+
+/ck help - show the help message
+
+/ck show settings - show the current settings
+
+/ck display on - show the on-screen message when you land a critical hit or a kill
+
+/ck display off - hide the on-screen message and play only the sound
+
+/ck normal on - reset the crit streak on a normal hit and at the end of a fight
+
+/ck normal off - reset the crit streak only at the end of a fight
+
+/ck critsound on / off - enable or disable the sound for critical hits
+
+/ck killsound on / off - enable or disable the sound for kills
+
+/ck sound on / off - enable or disable the sound for both critical hits and kills
+
+/ck ach critsound on / off - enable or disable the sound for crit-milestone achievements
+
+/ck fullreset - reset all statistics

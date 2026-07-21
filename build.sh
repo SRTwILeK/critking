@@ -40,6 +40,7 @@ EXCLUDES=(
 	".vscode"
 	"build.sh"
 	"CLAUDE.md"
+	"DESCRIPTION.txt"
 	"release"
 )
 
