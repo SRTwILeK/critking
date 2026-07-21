@@ -1,6 +1,10 @@
 ﻿
 CRITKINGPREFIX = "CK"
-CRITKINGVERSION = "0.5.1"
+
+-- Read the version straight from the .toc (## Version) so it lives in one place.
+-- C_AddOns.GetAddOnMetadata on newer clients, the global on TBC Classic (2.5.x).
+local GetMeta = ( C_AddOns and C_AddOns.GetAddOnMetadata ) or GetAddOnMetadata
+CRITKINGVERSION = ( GetMeta and GetMeta( "CritKing", "Version" ) ) or "1.0"
 
 CritKing = {} -- critking class :)
 CritKing.__index = CritKing
@@ -24,21 +28,21 @@ CritKingVarsDefault = {
 }
 
 function CritKingLoadVar( objSrc, objDst )
-	if ( objDst == nil ) then
-		objDst = {}
-	end
+    if ( objDst == nil ) then
+        objDst = {}
+    end
     for key, value in pairs( objSrc ) do
-        if ( objDst[ key ] == nil ) then
-            objDst[ key ] = value
-        elseif ( type( value ) == 'table' ) then
-            if ( objDst[ key ] == nil ) then
+        if ( type( value ) == 'table' ) then
+            if ( type( objDst[ key ] ) ~= 'table' ) then
                 objDst[ key ] = {}
             end
-            CritKingLoadVar( value, objDst[ key ])
+            CritKingLoadVar( value, objDst[ key ] )
+        elseif ( objDst[ key ] == nil ) then
+            objDst[ key ] = value
         end
     end
 
-    CritKing.SendMsg( "Set variables from defaults ..." )
+    return objDst
 end
 
 
@@ -58,6 +62,8 @@ CritKing.Damage = 0           -- The actual damage
 CritKing.CritNum = 0          -- The actual critical number
 CritKing.KillNum = 0          -- The actual killing blow number
 CritKing.MaxKillNum = 0       -- The maximum killing blow number
+CritKing.SumCritDmg = 0       -- Sum of crit damage in the current combat
+CritKing.SumCritCount = 0     -- Number of crits in the current combat
 CritKing.CritMessages =
 {
     "Head shot!"        -- 1
@@ -114,7 +120,7 @@ CritKing.KillingMessages =
 {
     "First Blood!"          -- 1
   , "Double Kill!"          -- 2
-  , "Tripple Kill!"         -- 3
+  , "Triple Kill!"          -- 3
   , "Multi Kill!"           -- 4
   , "Ultra Kill!"           -- 5
   , "Mega Kill!"            -- 6
@@ -128,10 +134,10 @@ CritKing.KillingMessages =
   , "Ownage!"               -- 14
   , "Ownage!"               -- 14
   , "Ownage!"               -- 15
-  , "I am INVICIBLE!"       -- 16
-  , "I am INVICIBLE!"       -- 17
-  , "I am INVICIBLE!"       -- 18
-  , "I am INVICIBLE!"       -- 19
+  , "I am INVINCIBLE!"-- 16
+  , "I am INVINCIBLE!"-- 17
+  , "I am INVINCIBLE!"-- 18
+  , "I am INVINCIBLE!"-- 19
   , "YES! I'm a GOD!"       -- 20
 }
 
@@ -152,10 +158,10 @@ CritKing.Killingsounds =
   , "Interface\\Addons\\CritKing\\sounds\\ownage.ogg"
   , "Interface\\Addons\\CritKing\\sounds\\ownage.ogg"
   , "Interface\\Addons\\CritKing\\sounds\\ownage.ogg"
-  , "Interface\\Addons\\CritKing\\sounds\\invicible.ogg"
-  , "Interface\\Addons\\CritKing\\sounds\\invicible.ogg"
-  , "Interface\\Addons\\CritKing\\sounds\\invicible.ogg"
-  , "Interface\\Addons\\CritKing\\sounds\\invicible.ogg"
+  , "Interface\\Addons\\CritKing\\sounds\\invincible.ogg"
+  , "Interface\\Addons\\CritKing\\sounds\\invincible.ogg"
+  , "Interface\\Addons\\CritKing\\sounds\\invincible.ogg"
+  , "Interface\\Addons\\CritKing\\sounds\\invincible.ogg"
   , "Interface\\Addons\\CritKing\\sounds\\god.ogg"
 }
 
@@ -163,31 +169,31 @@ CritKing.Sum = {
     Crit = {
         ['10'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\ohyeah.ogg",
-            msg = "100 Critical!!! Ohhh yeah!!!"
+            msg = "10 critical hits!!! Ohhh yeah!!!"
         },
         ['1000'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\ohyeah.ogg",
-            msg = "1000 Critical!!! Ohhh yeah!!! Great job!"
+            msg = "1000 critical hits!!! Ohhh yeah!!! Great job!"
         },
         ['5000'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\killer.ogg",
-            msg = "5000 Critical!!! You are a killer machine!"
+            msg = "5000 critical hits!!! You are a killing machine!"
         },
         ['10000'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\holyshit.ogg",
-            msg = "10000 Critical!!! Holy shit! You are awesome!!"
+            msg = "10000 critical hits!!! Holy shit! You are awesome!!"
         },
         ['13200'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\monsterkill.ogg",
-            msg = "13200 Critical!!! Critter killer!"
+            msg = "13200 critical hits!!! Critter killer!"
         },
         ['18000'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\monsterkill.ogg",
-            msg = "18000 Critical!!! Killer machine! You are the best!"
+            msg = "18000 critical hits!!! Killing machine! You are the best!"
         },
         ['20000'] = {
             sound = "Interface\\Addons\\CritKing\\sounds\\ownage.ogg",
-            msg = "20000 Critical!!! Ohhhh mmmmmyyyy goooooooodddddd!!!"
+            msg = "20000 critical hits!!! Ohhhh mmmmmyyyy goooooooodddddd!!!"
         }
     }
 }
@@ -217,9 +223,9 @@ end
 
 function CritKing.ShowSettings()
     local msg = 'Display: ' .. tostring( CritKingVars.Display ) .. ', Reset after normal hit: ' .. tostring( CritKingVars.ResetOnNormalHit )
-            .. ' Kill sound: ' .. tostring( CritKingVars.Sound.Kill ) .. ' Crit sound: ' .. tostring( CritKingVars.Sound.Crit )
-            .. ' Achievement crit sound: ' .. tostring( CritKingVars.Sound.Ach.Crit )
-            .. ' Crit stat: ' .. tostring( CritKingVars.Stat.Sum.Crit ) .. ' Kill stat: ' .. tostring( CritKingVars.Stat.Sum.Kill )
+            .. ', Kill sound: ' .. tostring( CritKingVars.Sound.Kill ) .. ', Crit sound: ' .. tostring( CritKingVars.Sound.Crit )
+            .. ', Achievement crit sound: ' .. tostring( CritKingVars.Sound.Ach.Crit )
+            .. ', Total crits: ' .. tostring( CritKingVars.Stat.Sum.Crit ) .. ', Total kills: ' .. tostring( CritKingVars.Stat.Sum.Kill )
 
     CritKing.SendMsg( "Settings: " .. msg )
 end
@@ -232,28 +238,28 @@ function CritKing.OnCommand( args )
     then
         if ( string.lower( args ) == "help" )
         then
-            CritKing.SendMsg( "/ck display on  - enable error frame messages" )
-            CritKing.SendMsg( "/ck display off - disable error frame messages" )
+            CritKing.SendMsg( "/ck display on  - enable on-screen messages" )
+            CritKing.SendMsg( "/ck display off - disable on-screen messages" )
 
-            CritKing.SendMsg( "/ck normal on - reset critical statistic when hit normal and end of fight" )
-            CritKing.SendMsg( "/ck normal off - reset critical statistic just when end of fight" )
+            CritKing.SendMsg( "/ck normal on - reset the crit streak on a normal hit and at the end of a fight" )
+            CritKing.SendMsg( "/ck normal off - reset the crit streak only at the end of a fight" )
 
-            CritKing.SendMsg( "/ck critsound on - enable sound when hit critical" )
-            CritKing.SendMsg( "/ck critsound off - disable sound when hit critical" )
-            CritKing.SendMsg( "/ck killsound on - enable sound when kill enemy" )
-            CritKing.SendMsg( "/ck killsound off - disable sound when kill enemy" )
-            CritKing.SendMsg( "/ck sound on - enable sound when hit critical and kill enemy" )
-            CritKing.SendMsg( "/ck sound off - disable sound when hit critical and kill enemy" )
+            CritKing.SendMsg( "/ck critsound on - enable the sound when you land a critical hit" )
+            CritKing.SendMsg( "/ck critsound off - disable the sound when you land a critical hit" )
+            CritKing.SendMsg( "/ck killsound on - enable the sound when you kill an enemy" )
+            CritKing.SendMsg( "/ck killsound off - disable the sound when you kill an enemy" )
+            CritKing.SendMsg( "/ck sound on - enable the sound for both critical hits and kills" )
+            CritKing.SendMsg( "/ck sound off - disable the sound for both critical hits and kills" )
 
-            CritKing.SendMsg( "/ck ach critsound on - enable sound when reach critical achievement" )
-            CritKing.SendMsg( "/ck ach critsound off - disable sound when reach critical achievement" )
+            CritKing.SendMsg( "/ck ach critsound on - enable the sound when you reach a crit achievement" )
+            CritKing.SendMsg( "/ck ach critsound off - disable the sound when you reach a crit achievement" )
 
-            CritKing.SendMsg( "/ck show settings" )
-            CritKing.SendMsg( "/ck help - display this text" )
+            CritKing.SendMsg( "/ck show settings - show the current settings" )
+            CritKing.SendMsg( "/ck help - show this text" )
 
-            CritKing.SendMsg( "/ck fullreset - reset all statistic value" )
+            CritKing.SendMsg( "/ck fullreset - reset all statistics" )
 
-            CritKing.SendMsg( "/ck - display max damage, critical number, killing blow statistic" )
+            CritKing.SendMsg( "/ck - show max damage, critical-hit and killing-blow statistics" )
             return
         end
 
@@ -261,7 +267,7 @@ function CritKing.OnCommand( args )
         then
             CritKingVars.Display = true
             --CritKingDisplay = "on"
-            CritKing.SendMsg( "set display on" )
+            CritKing.SendMsg( "On-screen messages enabled." )
             return
         end
 
@@ -269,49 +275,49 @@ function CritKing.OnCommand( args )
         then
             CritKingVars.Display = false
             --CritKingDisplay = "off"
-            CritKing.SendMsg( "set display off" )
+            CritKing.SendMsg( "On-screen messages disabled." )
             return
         end
 
         if ( string.lower( args ) == "normal on" )
         then
             CritKingVars.ResetOnNormalHit = true
-            CritKing.SendMsg( "reset critical statistic when hit normal" )
+            CritKing.SendMsg( "The crit streak will now reset on a normal hit." )
             return
         end
 
         if ( string.lower( args ) == "normal off" )
         then
             CritKingVars.ResetOnNormalHit = false
-            CritKing.SendMsg( "no reset critical statistic when hit normal" )
+            CritKing.SendMsg( "The crit streak will no longer reset on a normal hit." )
             return
         end
 
         if ( string.lower( args ) == "critsound on" )
         then
             CritKingVars.Sound.Crit = true
-            CritKing.SendMsg( "enable sound when hit critical" )
+            CritKing.SendMsg( "Sound enabled for critical hits." )
             return
         end
 
         if ( string.lower( args ) == "critsound off" )
         then
             CritKingVars.Sound.Crit = false
-            CritKing.SendMsg( "disable sound when hit critical" )
+            CritKing.SendMsg( "Sound disabled for critical hits." )
             return
         end
 
         if ( string.lower( args ) == "killsound on" )
         then
             CritKingVars.Sound.Kill = true
-            CritKing.SendMsg( "enable sound when kill enemy" )
+            CritKing.SendMsg( "Sound enabled for kills." )
             return
         end
 
         if ( string.lower( args ) == "killsound off" )
         then
             CritKingVars.Sound.Kill = false
-            CritKing.SendMsg( "disable sound when kill enemy" )
+            CritKing.SendMsg( "Sound disabled for kills." )
             return
         end
 
@@ -319,7 +325,7 @@ function CritKing.OnCommand( args )
         then
             CritKingVars.Sound.Crit = true
             CritKingVars.Sound.Kill = true
-            CritKing.SendMsg( "enable sound when hit critical and when kill enemy" )
+            CritKing.SendMsg( "Sound enabled for critical hits and kills." )
             return
         end
 
@@ -327,21 +333,21 @@ function CritKing.OnCommand( args )
         then
             CritKingVars.Sound.Crit = false
             CritKingVars.Sound.Kill = false
-            CritKing.SendMsg( "disable sound when hit critical and when kill enemy" )
+            CritKing.SendMsg( "Sound disabled for critical hits and kills." )
             return
         end
 
         if ( string.lower( args ) == "ach critsound on" )
         then
             CritKingVars.Sound.Ach.Crit = true
-            CritKing.SendMsg( "enable sound when reach critical achievement" )
+            CritKing.SendMsg( "Sound enabled for crit achievements." )
             return
         end
 
         if ( string.lower( args ) == "ach critsound off" )
         then
             CritKingVars.Sound.Ach.Crit = false
-            CritKing.SendMsg( "disable sound when reach critical achievement" )
+            CritKing.SendMsg( "Sound disabled for crit achievements." )
             return
         end
 
@@ -360,18 +366,18 @@ function CritKing.OnCommand( args )
         end
     end
 
-    local avgCritDmg = CritKing.SumCritDmg or 0 / CritKing.CritNum or 0
-    if ( tostring( avgCritDmg ) == "-nan(ind)" ) then
-        avgCritDmg = 0
+    local avgCritDmg = 0
+    if ( CritKing.SumCritCount > 0 ) then
+        avgCritDmg = math.floor( CritKing.SumCritDmg / CritKing.SumCritCount )
     end
 
     -- no parameters given, show the infos
     CritKing.SendMsg( " - Max damage: " .. CritKing.MaxDamage )
-    CritKing.SendMsg( " - Max crit num: " .. CritKing.MaxCritNum )
-    CritKing.SendMsg( " - Max kill num: " .. CritKing.MaxKillNum )
-    CritKing.SendMsg( " - Avg crit damage: " .. avgCritDmg )
-    CritKing.SendMsg( " - All crit num: " .. CritKingVars.Stat.Sum.Crit )
-    CritKing.SendMsg( " - All kill num: " .. CritKingVars.Stat.Sum.Kill )
+    CritKing.SendMsg( " - Highest crit streak: " .. CritKing.MaxCritNum )
+    CritKing.SendMsg( " - Highest kill streak: " .. CritKing.MaxKillNum )
+    CritKing.SendMsg( " - Average crit damage: " .. avgCritDmg )
+    CritKing.SendMsg( " - Total critical hits: " .. CritKingVars.Stat.Sum.Crit )
+    CritKing.SendMsg( " - Total kills: " .. CritKingVars.Stat.Sum.Kill )
 end
 
 -- Fired when the player hit critical
@@ -430,6 +436,7 @@ function CritKing.ResetStat()
     CritKing.ResetCrit()
     CritKing.ResetKill()
     CritKing.SumCritDmg = 0
+    CritKing.SumCritCount = 0
 end
 
 function CritKing.OnCombatLog( ... )
@@ -447,11 +454,14 @@ function CritKing.OnCombatLog( ... )
     
     local spellId, spellName, spellSchool
     local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand
+    local isDamage = false
 
     if subevent == "SWING_DAMAGE" then
         amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = select(12, ...)
-    elseif subevent == "SPELL_DAMAGE" then
+        isDamage = true
+    elseif ( subevent == "SPELL_DAMAGE" ) or ( subevent == "RANGE_DAMAGE" ) then
         spellId, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = select(12, ...)
+        isDamage = true
     end
 
     if ( subevent == "PARTY_KILL" )
@@ -470,12 +480,18 @@ function CritKing.OnCombatLog( ... )
         return
     end
 
+    if ( not isDamage ) -- only damage events affect the crit streak
+    then
+        return
+    end
+
     if critical
     then
         local action = spellId and GetSpellLink( spellId ) or MELEE
         CritKing.CritNum = CritKing.CritNum + 1
         CritKing.Damage = amount
         CritKing.SumCritDmg = CritKing.SumCritDmg + amount
+        CritKing.SumCritCount = CritKing.SumCritCount + 1
 
         if ( amount > CritKing.MaxDamage )
         then
@@ -510,13 +526,9 @@ function CritKing.OnEvent(self, event, ...)
     then
         CritKing.VariablesLoaded = true
         CritKing.PlayerGUID = UnitGUID( "player" )
-        CritKing.SendMsg( "variables loaded! " .. CRITKINGVERSION )
-		if ( CritKingVars == nil ) then
-			CritKingVars = CritKingVarsDefault
-		else
-			CritKingLoadVar( CritKingVarsDefault, CritKingVars )
-		end	
-		
+        CritKing.SendMsg( "Loaded! Version " .. CRITKINGVERSION )
+		CritKingVars = CritKingLoadVar( CritKingVarsDefault, CritKingVars )
+
         return
     end
 
